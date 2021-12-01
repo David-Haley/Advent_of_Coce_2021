@@ -7,17 +7,10 @@ with Ada.Containers.Vectors;
 
 procedure December_01 is
 
+   Window : constant Positive := 3;
+
    package Depth_Tables is new Ada.Containers.Vectors (Positive, Positive);
    use Depth_Tables;
-
-
-   Input_File : File_Type;
-   Text : Unbounded_String;
-   Depth, Previous_Depth : Positive;
-   Increase : Natural := 0;
-   Window : constant Positive := 3;
-   Depth_Table : Depth_Tables.Vector;
-   Depth_Index : Positive;
 
       function Sum (Depth_Table : in Depth_Tables.Vector;
                     Start : in Positive) return Positive is
@@ -30,6 +23,13 @@ procedure December_01 is
          end loop; -- I in Positive range Start .. Start + Window - 1
          return Result;
       end Sum;
+
+   Input_File : File_Type;
+   Text : Unbounded_String;
+   Depth, Previous_Depth : Positive;
+   Increase : Natural := 0;
+   Depth_Table : Depth_Tables.Vector;
+   Depth_Index : Positive;
 
 begin -- December_01
    Open (Input_File, In_File, "december_01.txt");
