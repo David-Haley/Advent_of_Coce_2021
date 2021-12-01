@@ -1,5 +1,3 @@
-
-
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Text_IO.Unbounded_IO; use Ada.Text_IO.Unbounded_IO;
 with Ada.Strings; use Ada.Strings;
@@ -12,11 +10,12 @@ procedure December_01 is
    package Depth_Tables is new Ada.Containers.Vectors (Positive, Positive);
    use Depth_Tables;
 
-   Window : constant Positive := 3;
+
    Input_File : File_Type;
+   Text : Unbounded_String;
    Depth, Previous_Depth : Positive;
    Increase : Natural := 0;
-   Text : Unbounded_String;
+   Window : constant Positive := 3;
    Depth_Table : Depth_Tables.Vector;
    Depth_Index : Positive;
 
@@ -33,7 +32,7 @@ procedure December_01 is
       end Sum;
 
 begin -- December_01
-   Open (Input_File, In_File, "20211201.txt");
+   Open (Input_File, In_File, "december_01.txt");
    Get_Line (Input_File, Text);
    Previous_Depth := Positive'Value (To_String (Text));
    Append (Depth_Table, Previous_Depth);
