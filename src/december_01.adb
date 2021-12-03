@@ -1,4 +1,5 @@
 with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Text_IO.Unbounded_IO; use Ada.Text_IO.Unbounded_IO;
 with Ada.Strings; use Ada.Strings;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
@@ -12,17 +13,17 @@ procedure December_01 is
    package Depth_Tables is new Ada.Containers.Vectors (Positive, Positive);
    use Depth_Tables;
 
-      function Sum (Depth_Table : in Depth_Tables.Vector;
-                    Start : in Positive) return Positive is
+   function Sum (Depth_Table : in Depth_Tables.Vector;
+                 Start : in Positive) return Positive is
 
-         Result : Natural := 0;
+      Result : Natural := 0;
 
-      begin -- Sum
-         for I in Positive range Start .. Start + Window - 1 loop
-            Result := Result + Depth_Table (I);
-         end loop; -- I in Positive range Start .. Start + Window - 1
-         return Result;
-      end Sum;
+   begin -- Sum
+      for I in Positive range Start .. Start + Window - 1 loop
+         Result := Result + Depth_Table (I);
+      end loop; -- I in Positive range Start .. Start + Window - 1
+      return Result;
+   end Sum;
 
    Input_File : File_Type;
    Text : Unbounded_String;
@@ -32,7 +33,11 @@ procedure December_01 is
    Depth_Index : Positive;
 
 begin -- December_01
-   Open (Input_File, In_File, "december_01.txt");
+   if Argument_Count = 0 then
+      Open (Input_File, In_File, "december_01.txt");
+   else
+      Open (Input_File, In_File, Argument(1));
+   end if; -- Argument_Count = 0
    Get_Line (Input_File, Text);
    Previous_Depth := Positive'Value (To_String (Text));
    Append (Depth_Table, Previous_Depth);

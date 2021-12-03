@@ -1,4 +1,5 @@
 with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Text_IO.Unbounded_IO; use Ada.Text_IO.Unbounded_IO;
 with Ada.Strings; use Ada.Strings;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
@@ -18,7 +19,11 @@ procedure December_02 is
    Aim : Integer := 0;
 
 begin -- December_02
+   if Argument_Count = 0 then
    Open (Input_File, In_File, "december_02.txt");
+   else
+      Open (Input_File, In_File, Argument(1));
+   end if; -- Argument_Count = 0
    while not End_Of_Line (Input_File) loop
       Get_Line (Input_File, Text);
       Get (To_String (Text), Direction, Last);
