@@ -27,9 +27,6 @@ procedure December_16 is
    subtype Words is Unsigned_64;
    subtype Word_Lengths is Positive range 1 .. 63;
 
-   package Word_IO is new Ada.Text_IO.Modular_IO (Words);
-   use Word_IO;
-
    procedure Get_Input (Bit_Stream : out Bit_Streams) is
 
       -- december_16 [Input_File_Name]
@@ -64,7 +61,6 @@ procedure December_16 is
 
       package Results is new Ada.Containers.Vectors (Positive, Words);
       use Results;
-
 
       function Sub_Parse (Bit_Stream : in out Bit_Streams;
                           Part_One : in out Words;
@@ -156,8 +152,8 @@ procedure December_16 is
       begin -- Sub_Parse
          while Bit_Stream.Bit_Index < Bit_Stream.Last_Bit - 6 and
            Sub_Packet_Count < Number_Of_Sub_Packets loop
-            -- The header is at least six bits so if there are fewer than six
-            -- bitsremaining, the end has been reached
+            -- The header is at least six bits, so if there are fewer than six
+            -- bit sremaining, the end has been reached
             Part_One := Part_One + Pack (Bit_Stream, 3); -- Get version
             Type_ID := Pack (Bit_Stream, 3);
             Sub_Packet_Count := Sub_Packet_Count + 1;
