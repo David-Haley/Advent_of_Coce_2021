@@ -4,6 +4,8 @@ with Ada.Assertions; use Ada.Assertions;
 with Ada.Text_IO.Unbounded_IO; use Ada.Text_IO.Unbounded_IO;
 with Ada.Strings; use Ada.Strings;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with Ada.Containers; use Ada.Containers;
+with  Ada.Containers.Vectors;
 with DJH.Execution_Time; use DJH.Execution_Time;
 
 procedure December_23 is
@@ -84,8 +86,32 @@ procedure December_23 is
                     Cost : in Costs;
                     Least_Cost : in out Costs) is
 
-         Room_Table : constant array (Amphipods) of X_Coordinates :=
-           (A => Room_A, B => Room_B, C => Room_C, D => Room_D);
+      type Coordinates is record
+         X : X_Coordinates;
+         Y : Y_Coordinates;
+      end record; -- Coordinates
+
+      type Moves is record
+         Start, Finish : Coordinates;
+      end record; -- Moves
+
+      package Move_Lists is new Ada.Containers.Vectors (Positive, Moves);
+      use Move_Lists;
+
+      subtype Y_Rooms is Y_Coordinates range Room_1 .. Room_2;
+
+      subtype Hall_Indices is Natural range 0 .. 6;
+
+      Hall_Table : constant array (Hall_Indices) of X_Coordinates :=
+        (Hall_1, Hall_2, Hall_3, Hall_4, Hall_5, Hall_6, Hall_7);
+
+      subtype Room_Indices is Natural range 0 .. 3;
+
+      Room_Table : constant array (Room_Indices) of X_Coordinates :=
+        (Room_A, Room_B, Room_C, Room_D);
+
+      Target_Table : constant array (Amphipods) of X_Coordinates :=
+        (A => Room_A, B => Room_B, C => Room_C, D => Room_D);
 
       function Solved (State : in States) return Boolean is
 
@@ -96,54 +122,97 @@ procedure December_23 is
            State (Room_D, Room_1) = D and State (Room_D, Room_2) = D;
       end Solved;
 
-      function Move_Cost (Source_X : in X_Coordinates;
-                          Source_Y : in Y_Coordinates;
-                          Destination_X : in X_Coordinates;
-                          Destination_Y : in Y_Coordinates) return Costs is
+      function Move_Cost (Move : in Moves;
+                          State : in States) return Costs is
 
          Cost_Table : constant array (Amphipods) of Costs :=
            (A => 1, B => 10, C => 100, D => 1000);
 
       begin -- Move_Cost
-         return (abs (X_Coordinates'Pos (Source_X) -
-                   X_Coordinates'Pos (Destination_X)) +
-                 abs (Y_Coordinates'Pos (Source_Y) -
-                     Y_Coordinates'Pos (Destination_Y))) *
-           Cost_Table (State (Source_X, Source_Y));
+         if Move.Start.Y = Hall or Move.Finish.Y = Hall then
+            return (abs (X_Coordinates'Pos (Move.Finish.X) -
+                      X_Coordinates'Pos (Move.Start.X)) +
+                    abs (Y_Coordinates'Pos (Move.Finish.Y) -
+                        Y_Coordinates'Pos (Move.Start.Y))) *
+              Cost_Table (State (Move.Start.X, Move.Start.Y));
+         else
+            -- Room to room move
+            return (abs (X_Coordinates'Pos (Move.Finish.X) -
+                      X_Coordinates'Pos (Move.Start.X)) +
+                    (Y_Coordinates'Pos (Move.Finish.Y) -
+                         Y_Coordinates'Pos (Hall)) +
+                    (Y_Coordinates'Pos (Move.Start.Y) -
+                         Y_Coordinates'Pos (Hall))) *
+              Cost_Table (State (Move.Start.X, Move.Start.Y));
+         end if; --  Move.Start.Y = Hall or Move.Finish.Y = Hall
       end Move_Cost;
 
-      function Hall_Clear (X_Src_In : in X_Coordinates;
-                           X_Dst : in X_Coordinates;
-                           From_Hall : in Boolean := False) return Boolean is
+      function Valid_Move (Move : in Moves;
+                           State : in States) return Boolean is
 
-         Result : Boolean := True;
+         Result : Boolean;
          X_Src : X_Coordinates;
+         Content : Contents := State (Move.Start.X, Move.Start.Y);
 
-      begin -- Hall_Clear
-         if X_Src_In < X_Dst then
-            if From_Hall then
-               X_Src := X_Coordinates'Succ (X_Src_In);
-            end if; -- From_Hall;
-            for X in X_Coordinates range X_Src .. X_Dst loop
-               Result := Result and State (X, Hall) = Empty;
-            end loop; -- X in X_Coordinates range X_Src .. X_Dst
-         else
-            if From_Hall then
-               X_Src := X_Coordinates'Pred (X_Src_In);
-            end if; -- From_Hall;
-            for X in X_Coordinates range X_Dst .. X_Src loop
-               Result := Result and State (X, Hall) = Empty;
-            end loop; -- X in X_Coordinates range X_Dst .. X_Src
-         end if; -- X_Src < X_Dst
+      begin -- Valid_Move
+         Result := Content in Amphipods and then
+         -- Amphipod at start of move
+           State (Move.Finish.X, Move.Finish.Y) = Empty and then
+         -- Finish is clear
+           (Move.Finish.Y = Hall or else
+            (Move.Finish.X = Target_Table (Content)
+            -- Finish hall or correct room
+            and then
+              ((Move.Finish.Y = Room_2 and
+                    State (Move.Finish.X, Room_1) = Empty)
+                 -- if Finish is Room_2 then Room_1 must be Empty
+               or else
+                 (Move.Finish.Y = Room_1 and State (Move.Finish.X, Room_2) =
+                      Content)))) and then
+         -- If Finish is Room_1 then Room_2 must be occupied by the correct
+         -- Amphipod.
+           (Move.Start.Y /= Room_2 or else
+            State (Move.Start.X, Room_1) = Empty) and then
+         -- If Start is Room_2 then Room_1 must be clear
+           (Move.Start.Y = Hall or else Target_Table (Content) /= Move.Start.X
+            -- Not in correct room
+            or else
+              (Move.Start.Y = Room_1 and then
+               Target_Table (State (Move.Start.X, Room_2)) /= Move.Start.X));
+         -- alternatively in correct room and trapping wrong Amphipod for room.
+         if Result then
+            -- Check that hallway is clear
+            if Move.Start.X < Move.Finish.X then
+               if Move.Start.Y = Hall then
+                  X_Src := X_Coordinates'Succ (Move.Start.X);
+               else
+                  X_Src := Move.Start.X;
+               end if; -- Move.Start.Y = Hall
+               for X in X_Coordinates range X_Src .. Move.Finish.X loop
+                  Result := Result and State (X, Hall) = Empty;
+               end loop; -- X in X_Coordinates range X_Src .. Move.Finish.X
+            else
+               if Move.Start.Y = Hall then
+                  X_Src := X_Coordinates'Pred (Move.Start.X);
+               else
+                  X_Src := Move.Start.X;
+               end if; -- Move.Start.Y = Hall
+               for X in X_Coordinates range Move.Finish.X .. X_Src loop
+                  Result := Result and State (X, Hall) = Empty;
+               end loop; -- X in X_Coordinates range Move.Finish.X .. X_Src
+            end if; -- Move.Start.X < Move.Finish.X
+         end if; -- Result
          return Result;
-      end Hall_Clear;
+      end Valid_Move;
 
-      Source_Y : Y_Coordinates;
-      Destination_X : X_Coordinates;
-      Destination_Y : Y_Coordinates;
       Next_State : States;
+      Move : Moves;
+      Move_List : Move_Lists.Vector;
+      Room_to_Room : Boolean;
 
    begin -- Solve
+      --  Put_Line (Cost'Img);
+      --  Put (State);
       if Solved (State) then
          if Cost < Least_Cost then
             Least_Cost := Cost;
@@ -151,65 +220,59 @@ procedure December_23 is
       elsif Cost < Least_Cost then
          -- the above is huresuic pruning, if the search costs more than a
          -- solution that has already been found, don't proceed
-         -- Explore moves from hallway to rooms
-         Source_Y := Hall;
-         for Source_X in X_Coordinates loop
-            if State (Source_X, Hall) in Amphipods then
-               Destination_Y := Hall; -- not a valid destination
-               Destination_X := Room_Table (State (Source_X, Hall));
-               if Hall_Clear (Source_X, Destination_X, True) then
-                  if State (Destination_X, Room_2) = Empty then
-                     Destination_Y := Room_2;
-                  elsif State (Destination_X, Room_2) = State (Source_X, Hall)
-                    and State (Destination_X, Room_1) = Empty then
-                     Destination_Y := Room_1;
-                  end if; -- State (Destination_X, Room_2) = Empty
-               end if; -- Hall_Clear (Source_X, Destination_X, True)
-               if Destination_Y /= Hall then
-                  -- Valid destination has been set, a move is possible
-                  Next_State := State;
-                  Next_State (Destination_X, Destination_Y) :=
-                    State (Source_X, Source_Y);
-                  Next_State (Source_X, Source_Y) := Empty;
-                  Solve (Next_State,
-                         Cost + Move_Cost (Source_X, Source_Y,
-                           Destination_X, Destination_Y),
-                         Least_Cost);
-               end if; -- Destination_Y /= Hall
-            end if; -- State (Source_X, Hall) in Amphipods
-         end loop; -- Source_X in X_Coordinates
-         -- Explore moves from rooms to hall
-         Destination_Y := Hall;
-         for Destination_X in X_Coordinates loop
-            if Destination_X /= Room_A and Destination_X /= Room_B and
-              Destination_X /= Room_C and Destination_X /= Room_D and
-              State (Destination_X, Destination_Y) = Empty then
-               for Source_X in X_Coordinates range Room_A .. Room_D loop
-                  Source_Y := Hall; -- not a valid source
-                  if Hall_Clear (Source_X, Destination_X) then
-                     if State (Source_X, Room_1) in Amphipods and then
-                       (Source_X /= Room_Table (State (Source_X, Room_1)) or
-                          Source_X /= Room_Table (State (Source_X, Room_2))) then
-                        Source_Y := Room_1;
-                     elsif State (Source_X, Room_2) in Amphipods and then
-                       Source_X /= Room_Table (State (Source_X, Room_2)) then
-                        Source_Y := Room_2;
-                     end if; -- State (Source_X, Room_1) in Amphipods and then ...
-                     if Source_Y /= Hall then
-                        -- Valid source has been set, a move is possible
-                        Next_State := State;
-                        Next_State (Destination_X, Destination_Y) :=
-                          Next_State (Source_X, Source_Y);
-                        Next_State (Source_X, Source_Y) := Empty;
-                        Solve (Next_State,
-                               Cost + Move_Cost (Source_X, Source_Y,
-                                 Destination_X, Destination_Y),
-                               Least_Cost);
-                     end if; -- Source_Y /= Hall
-                  end if; -- Hall_Clear (Source_X, Destination_X)
-               end loop; -- Source_X in X_Coordinates range Room_A .. Room_D
-            end if; -- Destination_X /= Room_A and Destination_X /= Room_B and ...
-         end loop; -- Destination_X in X_Coordinates
+         -- Explore moves from room to room or room to hall
+         for R_Start in Room_Indices loop
+            Room_to_Room := False;
+            Move.Start.X := Room_Table (R_Start);
+            for Y_Start in Y_Rooms loop
+               Move.Start.Y := Y_Start;
+               if State (Move.Start.X, Move.Start.Y) in Amphipods then
+                  Move.Finish.X :=
+                    Target_Table (State (Move.Start.X, Move.Start.Y));
+                  for Y_Finish in Y_Rooms loop
+                     Move.Finish.Y := Y_Finish;
+                     if Valid_Move (Move, State) then
+                        Room_to_Room := True;
+                        Append (Move_List, Move);
+                     end if; -- Valid_Move (Move, State)
+                  end loop; -- Y_Finish in Y_Rooms
+                  if not Room_to_Room then
+                     Move.Finish.Y := Hall;
+                     for H_Finish in Hall_Indices loop
+                        Move.Finish.X := Hall_Table (H_Finish);
+                        if Valid_Move (Move, State) then
+                           Append (Move_List, Move);
+                        end if; -- Valid_Move (Move, State)
+                     end loop; -- H_Finish in Hall_Indices
+                  end if; -- not Room_to_Room then
+               end if; -- State (Move.Start.X, Move.Start.Y) in Amphipods
+            end loop; -- Y_Start in Y_Rooms
+         end loop; -- R_Start in Room_Indices
+         -- Explore moves from hall to rooms
+         Move.Start.Y := Hall;
+         for H_Start in Hall_Indices loop
+            Move.Start.X := Hall_Table (H_Start);
+            if State (Move.Start.X, Move.Start.Y) in Amphipods then
+               Move.Finish.X :=
+                 Target_Table (State (Move.Start.X, Move.Start.Y));
+               for Y_Finish in Y_Rooms loop
+                  Move.Finish.Y := Y_Finish;
+                  if Valid_Move (Move, State) then
+                     Append (Move_List, Move);
+                  end if; -- Valid_Move (Move, State)
+               end loop; -- Y_Finish in Y_Rooms
+            end if; -- State (Move.Start.X, Move.Start.Y) in Amphipods
+         end loop; -- H_Start in Hall_Indices
+         -- Move list complete descend to next level
+         --  Put_Line ("Length:" & Count_Type'Image (Length (Move_List)));
+         for M in Iterate (Move_List) loop
+            Move := Move_List (M);
+            Next_State := State;
+            Next_State (Move.Finish.X, Move.Finish.Y) :=
+              Next_State (Move.Start.X, Move.Start.Y);
+            Next_State (Move.Start.X, Move.Start.Y) := Empty;
+            Solve (Next_State, Cost + Move_Cost (Move, State), Least_Cost);
+         end loop; -- M in Iterate (Move_List)
       end if; -- Solved (State)
    end Solve;
 
