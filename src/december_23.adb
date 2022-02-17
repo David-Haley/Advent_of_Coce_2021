@@ -11,13 +11,16 @@ with DJH.Execution_Time; use DJH.Execution_Time;
 procedure December_23 is
 
    type Contents is (Wall, Empty, A, B, C, D);
-
    subtype Amphipods is Contents range A .. D;
 
    type X_Coordinates is (Hall_1, Hall_2, Room_A, Hall_3, Room_B, Hall_4,
                           Room_C, Hall_5, Room_D, Hall_6, Hall_7);
 
-   type Y_Coordinates is (Hall, Room_1, Room_2);
+   Target_Table : constant array (Amphipods) of X_Coordinates :=
+     (A => Room_A, B => Room_B, C => Room_C, D => Room_D);
+
+   type Y_Coordinates is (Hall, Room_1, Room_2, Room_3, Room_4);
+   subtype Y_Rooms is Y_Coordinates range Room_1 .. Room_4;
 
    type States is array (X_Coordinates, Y_Coordinates) of Contents;
 
@@ -35,6 +38,15 @@ procedure December_23 is
 
    begin -- Get_Input
       Initial_State := (others => (Hall => Empty, others => Wall));
+      -- To generalise for either two rooms or four rooms, rooms three and
+      -- four are initialised to the solved stste.
+      -- #A#B#C#D# Room_3
+      -- #A#B#C#D# Room_4
+      for Amphipod in Amphipods loop
+         for Y in Y_Rooms range Room_3 .. Room_4 loop
+            Initial_State (Target_Table (Amphipod), Y) := Amphipod;
+         end loop; -- Y in Y_Rooms range Room_3 .. Room_4
+      end loop; -- Amphipod in Amphipods
       if Argument_Count = 0 then
          Open (Input_File, In_File, "december_23.txt");
       else
@@ -44,7 +56,7 @@ procedure December_23 is
       Assert ("#############" = To_String (Text), "Top wall not found");
       Get_Line (Input_File, Text);
       Assert ("#...........#" = To_String (Text), "Hallway not found");
-      for Y in Y_Coordinates range Room_1 .. Room_2 loop
+      for Y in Y_Rooms range Room_1 .. Room_2 loop
          Get_Line (Input_File, Text);
          if Y = Room_1 then
             Assert ("###" = Slice (Text, 1, 3), "Start Room_1 not found");
@@ -61,26 +73,10 @@ procedure December_23 is
            Amphipods'Value (Slice (Text, T_Room_C, T_Room_C));
          Initial_State (Room_D, Y) :=
            Amphipods'Value (Slice (Text, T_Room_D, T_Room_D));
-      end loop; -- Y in Y_Coordinates range Room_1 .. Room_2
+      end loop; -- Y in Y_Rooms range Room_1 .. Room_2
       Get_Line (Input_File, Text);
       Assert ("  #########" = To_String (Text), "Bottom wall not found");
    end Get_Input;
-
-   procedure Put (State : in States) is
-
-   begin -- Put
-      for Y in Y_Coordinates loop
-         for X in X_Coordinates loop
-            case State (X, Y) is
-               when Wall => Put ('#');
-               when A | B | C | D => Put (Amphipods'Image (State (X, Y)));
-               when Empty => Put (' ');
-            end case; -- State (X, Y)
-         end loop; -- X in X_Coordinates
-         New_Line;
-      end loop; -- Y in Y_Coordinates
-      New_Line;
-   end Put;
 
    procedure Solve (State : in States;
                     Cost : in Costs;
@@ -98,31 +94,33 @@ procedure December_23 is
       package Move_Lists is new Ada.Containers.Vectors (Positive, Moves);
       use Move_Lists;
 
-      subtype Y_Rooms is Y_Coordinates range Room_1 .. Room_2;
-
       subtype Hall_Indices is Natural range 0 .. 6;
 
       Hall_Table : constant array (Hall_Indices) of X_Coordinates :=
         (Hall_1, Hall_2, Hall_3, Hall_4, Hall_5, Hall_6, Hall_7);
+      -- This table is used to implement the rule that Amphipods cannot move to
+      -- a position in front of a room.
 
       subtype Room_Indices is Natural range 0 .. 3;
 
       Room_Table : constant array (Room_Indices) of X_Coordinates :=
         (Room_A, Room_B, Room_C, Room_D);
 
-      Target_Table : constant array (Amphipods) of X_Coordinates :=
-        (A => Room_A, B => Room_B, C => Room_C, D => Room_D);
-
       function Solved (State : in States) return Boolean is
 
       begin -- Solved
+         -- Obvious cantidate for nested loops but this should be faster
          return State (Room_A, Room_1) = A and State (Room_A, Room_2) = A and
+           State (Room_A, Room_3) = A and State (Room_A, Room_4) = A and
            State (Room_B, Room_1) = B and State (Room_B, Room_2) = B and
+           State (Room_B, Room_3) = B and State (Room_B, Room_4) = B and
            State (Room_C, Room_1) = C and State (Room_C, Room_2) = C and
-           State (Room_D, Room_1) = D and State (Room_D, Room_2) = D;
+           State (Room_C, Room_3) = C and State (Room_C, Room_4) = C and
+           State (Room_D, Room_1) = D and State (Room_D, Room_2) = D and
+           State (Room_D, Room_3) = D and State (Room_D, Room_4) = D;
       end Solved;
 
-      function Move_Cost (Move : in Moves;
+      function Move_Cost (Move : in out Moves;
                           State : in States) return Costs is
 
          Cost_Table : constant array (Amphipods) of Costs :=
@@ -130,6 +128,7 @@ procedure December_23 is
 
       begin -- Move_Cost
          if Move.Start.Y = Hall or Move.Finish.Y = Hall then
+            -- Room to hall or hall to room move (Manhattan distance!)
             return (abs (X_Coordinates'Pos (Move.Finish.X) -
                       X_Coordinates'Pos (Move.Start.X)) +
                     abs (Y_Coordinates'Pos (Move.Finish.Y) -
@@ -150,36 +149,90 @@ procedure December_23 is
       function Valid_Move (Move : in Moves;
                            State : in States) return Boolean is
 
+         -- Assumes that there ia an Amphipod at the start location and
+         -- checks that the move is otherwise valid.
+
+         function Valid_Start_Room (Move : in Moves;
+                                    State : in States) return Boolean is
+
+            -- Tests the rooms above are clear and the Amphipod is in the wrong
+            -- room or alternatively the Amphipod is trapping one or more
+            -- Amphipods which are in the wrong room.
+
+            Amphipod : Amphipods := State (Move.Start.X, Move.Start.Y);
+
+         begin -- Valid_Start_Room
+            return (Move.Start.Y = Room_1 and then
+                      (Target_Table (Amphipod) /= Move.Start.X or else
+                       State (Move.Start.X, Room_2) /= Amphipod or else
+                       State (Move.Start.X, Room_3) /= Amphipod or else
+                       State (Move.Start.X, Room_4) /= Amphipod))
+              or else
+                (Move.Start.Y = Room_2 and then
+                 State (Move.Start.X, Room_1) = Empty and then
+                   (Target_Table (Amphipod) /= Move.Start.X or else
+                    State (Move.Start.X, Room_3) /= Amphipod or else
+                    State (Move.Start.X, Room_4) /= Amphipod))
+              or else
+                (Move.Start.Y = Room_3 and then
+                 State (Move.Start.X, Room_1) = Empty and then
+                 State (Move.Start.X, Room_2) = Empty and then
+                   (Target_Table (Amphipod) /= Move.Start.X or else
+                    State (Move.Start.X, Room_4) /= Amphipod))
+              or else
+                (Move.Start.Y = Room_4 and then
+                 State (Move.Start.X, Room_1) = Empty and then
+                 State (Move.Start.X, Room_2) = Empty and then
+                 State (Move.Start.X, Room_3) = Empty and then
+                 Target_Table (Amphipod) /= Move.Start.X);
+         end Valid_Start_Room;
+
+         function Valid_Finish_Room (Move : in Moves;
+                                     State : in States) return Boolean is
+
+            -- Assumes that the the finish is Empty. tests that the Finish is in
+            -- the correct room which is either empty or only occupied by the
+            -- correct Amphipods.
+
+            Amphipod : Amphipods := State (Move.Start.X, Move.Start.Y);
+
+         begin -- Valid_Finish_Room
+            return Target_Table (Amphipod) = Move.Finish.X and then
+              ((Move.Finish.Y = Room_1 and then
+                State (Move.Finish.X, Room_2) = Amphipod and then
+                State (Move.Finish.X, Room_3) = Amphipod and then
+                State (Move.Finish.X, Room_4) = Amphipod)
+               or else
+                 (Move.Finish.Y = Room_2 and then
+                  State (Move.Finish.X, Room_1) = Empty and then
+                  State (Move.Finish.X, Room_3) = Amphipod and then
+                  State (Move.Finish.X, Room_4) = Amphipod)
+               or else
+                 (Move.Finish.Y = Room_3 and then
+                  State (Move.Finish.X, Room_1) = Empty and then
+                  State (Move.Finish.X, Room_2) = Empty and then
+                  State (Move.Finish.X, Room_4) = Amphipod)
+               or else
+                 (Move.Finish.Y = Room_4 and then
+                  State (Move.Finish.X, Room_1) = Empty and then
+                  State (Move.Finish.X, Room_2) = Empty and then
+                  State (Move.Finish.X, Room_3) = Empty));
+         end Valid_Finish_Room;
+
+         pragma Inline_Always (Valid_Start_Room, Valid_Finish_Room);
+
          Result : Boolean;
          X_Src : X_Coordinates;
-         Content : Contents := State (Move.Start.X, Move.Start.Y);
 
       begin -- Valid_Move
-         Result := Content in Amphipods and then
-         -- Amphipod at start of move
-           State (Move.Finish.X, Move.Finish.Y) = Empty and then
+         Result := State (Move.Finish.X, Move.Finish.Y) = Empty
          -- Finish is clear
-           (Move.Finish.Y = Hall or else
-            (Move.Finish.X = Target_Table (Content)
-            -- Finish hall or correct room
-            and then
-              ((Move.Finish.Y = Room_2 and
-                    State (Move.Finish.X, Room_1) = Empty)
-                 -- if Finish is Room_2 then Room_1 must be Empty
-               or else
-                 (Move.Finish.Y = Room_1 and State (Move.Finish.X, Room_2) =
-                      Content)))) and then
-         -- If Finish is Room_1 then Room_2 must be occupied by the correct
-         -- Amphipod.
-           (Move.Start.Y /= Room_2 or else
-            State (Move.Start.X, Room_1) = Empty) and then
-         -- If Start is Room_2 then Room_1 must be clear
-           (Move.Start.Y = Hall or else Target_Table (Content) /= Move.Start.X
-            -- Not in correct room
-            or else
-              (Move.Start.Y = Room_1 and then
-               Target_Table (State (Move.Start.X, Room_2)) /= Move.Start.X));
-         -- alternatively in correct room and trapping wrong Amphipod for room.
+           and then
+             ((Move.Start.Y /= Hall and then
+               Valid_Start_Room (Move, State) and then
+                 (Move.Finish.Y = Hall or else Valid_Finish_Room (Move, State)))
+              or else
+                (Move.Start.Y = Hall and then Valid_Finish_Room (Move, State)));
          if Result then
             -- Check that hallway is clear
             if Move.Start.X < Move.Finish.X then
@@ -205,6 +258,8 @@ procedure December_23 is
          return Result;
       end Valid_Move;
 
+      pragma Inline_Always (Solved, Move_Cost, Valid_Move);
+
       Next_State : States;
       Move : Moves;
       Move_List : Move_Lists.Vector;
@@ -227,6 +282,9 @@ procedure December_23 is
             for Y_Start in Y_Rooms loop
                Move.Start.Y := Y_Start;
                if State (Move.Start.X, Move.Start.Y) in Amphipods then
+                  -- Testing for room to room move first avoids a two step move
+                  -- to hall than move to room. It was coded on this basis on
+                  -- assumption that part two may have involved counting moves.
                   Move.Finish.X :=
                     Target_Table (State (Move.Start.X, Move.Start.Y));
                   for Y_Finish in Y_Rooms loop
@@ -244,7 +302,7 @@ procedure December_23 is
                            Append (Move_List, Move);
                         end if; -- Valid_Move (Move, State)
                      end loop; -- H_Finish in Hall_Indices
-                  end if; -- not Room_to_Room then
+                  end if; -- not Room_to_Room
                end if; -- State (Move.Start.X, Move.Start.Y) in Amphipods
             end loop; -- Y_Start in Y_Rooms
          end loop; -- R_Start in Room_Indices
@@ -264,7 +322,6 @@ procedure December_23 is
             end if; -- State (Move.Start.X, Move.Start.Y) in Amphipods
          end loop; -- H_Start in Hall_Indices
          -- Move list complete descend to next level
-         --  Put_Line ("Length:" & Count_Type'Image (Length (Move_List)));
          for M in Iterate (Move_List) loop
             Move := Move_List (M);
             Next_State := State;
@@ -285,5 +342,26 @@ begin -- December_23
    Least_Cost := Costs'Last;
    Solve (Initial_State, Cost, Least_Cost);
    Put_Line ("Part One Answer:" & Least_Cost'Img);
+   DJH.Execution_Time.Put_CPU_Time;
+   -- Part 2 initialisation
+   -- Move contents of Room_2 to Room_4
+   Initial_State (Room_A, Room_4) := Initial_State (Room_A, Room_2);
+   Initial_State (Room_B, Room_4) := Initial_State (Room_B, Room_2);
+   Initial_State (Room_C, Room_4) := Initial_State (Room_C, Room_2);
+   Initial_State (Room_D, Room_4) := Initial_State (Room_D, Room_2);
+   -- Initialise Room_2 and Room_3 as per problem description
+   Initial_State (Room_A, Room_2) := D;
+   Initial_State (Room_A, Room_3) := D;
+   Initial_State (Room_B, Room_2) := C;
+   Initial_State (Room_B, Room_3) := B;
+   Initial_State (Room_C, Room_2) := B;
+   Initial_State (Room_C, Room_3) := A;
+   Initial_State (Room_D, Room_2) := A;
+   Initial_State (Room_D, Room_3) := C;
+   -- Solve part 2
+   Cost := 0;
+   Least_Cost := Costs'Last;
+   Solve (Initial_State, Cost, Least_Cost);
+   Put_Line ("Part Two Answer:" & Least_Cost'Img);
    DJH.Execution_Time.Put_CPU_Time;
 end December_23;
