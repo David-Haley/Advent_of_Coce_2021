@@ -7,9 +7,8 @@ with Ada.Strings.Maps; use Ada.Strings.Maps;
 with Ada.Assertions; use Ada.Assertions;
 with Ada.Containers; use Ada.Containers;
 with Ada.Containers.Vectors;
-with Ada.Containers.Doubly_Linked_Lists;
-with Ada.Containers.Synchronized_Queue_Interfaces;
-with Ada.Containers.Unbounded_Synchronized_Queues;
+with Ada.Containers.Ordered_Maps;
+with Ada.Containers.Ordered_Sets;
 with Interfaces; use Interfaces;
 with DJH.Execution_Time; use DJH.Execution_Time;
 
@@ -81,15 +80,15 @@ procedure December_22 is
          Assert (Range_String = Slice (Text, First - Range_String'Length ,
                  First - 1), Ada.Text_IO.Count'Image (Line (Input_File) - 1) &
                    ": Expected """ & Range_String & """ found """ &
-                   Slice (Text, First - X_String'Length , First - 1) & '"');
+                   Slice (Text, First - Range_String'Length , First - 1) & '"');
          Boot_List_Element.Prism.X2 :=
            Coordinates'Value (Slice (Text, First, Last));
          Start_At := Last + 1;
          Find_Token (Text, Integer_Set, Start_At, Inside, First, Last);
          Assert (Y_String = Slice (Text, First - Y_String'Length , First - 1),
                  Ada.Text_IO.Count'Image (Line (Input_File) - 1) &
-                   ": Expected """ & X_String & """ found """ &
-           Slice (Text, First - Y_String'Length , First - 1) & '"');
+                   ": Expected """ & Y_String & """ found """ &
+                   Slice (Text, First - Y_String'Length , First - 1) & '"');
          Boot_List_Element.Prism.Y1 :=
            Coordinates'Value (Slice (Text, First, Last));
          Start_At := Last + 1;
@@ -97,7 +96,7 @@ procedure December_22 is
          Assert (Range_String = Slice (Text, First - Range_String'Length ,
                  First - 1), Ada.Text_IO.Count'Image (Line (Input_File) - 1) &
                    ": Expected """ & Range_String & """ and found """ &
-                   Slice (Text, First - X_String'Length , First - 1) & '"');
+                   Slice (Text, First - Range_String'Length , First - 1) & '"');
          Boot_List_Element.Prism.Y2 :=
            Coordinates'Value (Slice (Text, First, Last));
          Start_At := Last + 1;
@@ -105,7 +104,7 @@ procedure December_22 is
          Assert (Z_String = Slice (Text, First - Z_String'Length , First - 1),
                  Ada.Text_IO.Count'Image (Line (Input_File) - 1) &
                    ": Expected """ & Z_String & """ found """ &
-                   Slice (Text, First - X_String'Length , First - 1) & '"');
+                   Slice (Text, First - Z_String'Length , First - 1) & '"');
          Boot_List_Element.Prism.Z1 :=
            Coordinates'Value (Slice (Text, First, Last));
          Start_At := Last + 1;
@@ -113,7 +112,7 @@ procedure December_22 is
          Assert (Range_String = Slice (Text, First - Range_String'Length ,
                  First - 1), Ada.Text_IO.Count'Image (Line (Input_File) - 1) &
                    ": Expected """ & Range_String & """ found """ &
-                   Slice (Text, First - X_String'Length , First - 1) & '"');
+                   Slice (Text, First - Range_String'Length , First - 1) & '"');
          Boot_List_Element.Prism.Z2 :=
            Coordinates'Value (Slice (Text, First, Last));
          Append (Boot_List, Boot_List_Element);
@@ -127,16 +126,16 @@ procedure December_22 is
    begin -- Has_Intersection
       return (((Left.X1 <= Right.X1 and Right.X1 <= Left.X2) or
                 (Left.X1 <= Right.X2 and Right.X2 <= Left.X2)) and
-        ((Left.Y1 <= Right.Y1 and Right.Y1 <= Left.Y2) or
-             (Left.Y1 <= Right.Y2 and Right.Y2 <= Left.Y2)) and
-        ((Left.Z1 <= Right.Z1 and Right.Z1 <= Left.Z2) or
+                ((Left.Y1 <= Right.Y1 and Right.Y1 <= Left.Y2) or
+                     (Left.Y1 <= Right.Y2 and Right.Y2 <= Left.Y2)) and
+                  ((Left.Z1 <= Right.Z1 and Right.Z1 <= Left.Z2) or
                      (Left.Z1 <= Right.Z2 and Right.Z2 <= Left.Z2))) or
           (((Right.X1 <= Left.X1 and Left.X1 <= Right.X2) or
-                (Right.X1 <= Left.X2 and Left.X2 <= Right.X2)) and
-        ((Right.Y1 <= Left.Y1 and Left.Y1 <= Right.Y2) or
-             (Right.Y1 <= Left.Y2 and Left.Y2 <= Right.Y2)) and
-        ((Right.Z1 <= Left.Z1 and Left.Z1 <= Right.Z2) or
-             (Right.Z1 <= Left.Z2 and Left.Z2 <= Right.Z2)));
+              (Right.X1 <= Left.X2 and Left.X2 <= Right.X2)) and
+             ((Right.Y1 <= Left.Y1 and Left.Y1 <= Right.Y2) or
+                  (Right.Y1 <= Left.Y2 and Left.Y2 <= Right.Y2)) and
+               ((Right.Z1 <= Left.Z1 and Left.Z1 <= Right.Z2) or
+                  (Right.Z1 <= Left.Z2 and Left.Z2 <= Right.Z2)));
    end Has_Intersection;
 
    procedure Update (Cube_Array : in out Cube_Arrays;
@@ -208,395 +207,246 @@ procedure December_22 is
       return Result;
    end Cube_Count;
 
-   procedure Find_Z_Limits (Boot_List : in Boot_Lists.Vector;
-                            Z_Min, Z_Max : out Coordinates) is
-
-   begin -- Find_Z_Limits
-      Z_Min := Coordinates'Last;
-      Z_Max := Coordinates'First;
-      for B in Iterate (Boot_List) loop
-         if Boot_List (B).Prism.Z1 < Z_Min then
-            Z_Min := Boot_List (B).Prism.Z1;
-         end if; -- Boot_List (B).Prism.Z1 < Z_Min
-         if Boot_List (B).Prism.Z2 > Z_Max then
-            Z_Max := Boot_List (B).Prism.Z2;
-         end if; -- Boot_List (B).Z2 > Z_Max
-      end loop; -- B in Iterate (Boot_List)
-   end Find_Z_Limits;
-
-   function Part_Two_Count (Boot_List : in Boot_Lists.Vector;
-                            Z_Min, Z_Max : in Coordinates)
+   function Part_Two_Count (Boot_List : in Boot_Lists.Vector)
                             return Unsigned_64 is
 
-      subtype Z_Coordinates is Coordinates range Z_Min .. Z_Max;
+      -- Problem is reduced to a one dimentional task which reduces to summing
+      -- non overlaping line segments parallel to the X axis. By iterating over
+      -- the Z and Y ranges all cubes are counted along a single line. For
+      -- efficiency only Z and Y values near boundaries are evaluated as those
+      -- between the boundaries are the same and can be summed without
+      -- recalculation.
 
       type Rectangles is Record
+         Command : Boolean;
          X1, Y1, X2, Y2 : Coordinates;
       end record; -- Rectangles
 
-      subtype Vertex_Counts is Natural with
-         Static_Predicate => Vertex_Counts in 0 .. 2 | 4;
+      package Rectangle_Lists is new
+        Ada.Containers.Vectors (Positive, Rectangles);
+      use Rectangle_Lists;
 
-      package On_Lists is new Ada.Containers.Doubly_Linked_Lists (Rectangles);
-      use On_Lists;
+      package Coordinate_Lists is new
+        Ada.Containers.Ordered_Maps (Coordinates, Coordinates);
+      use Coordinate_Lists;
 
-      package On_Queue_Inteface is new
-        Ada.Containers.Synchronized_Queue_Interfaces (Rectangles);
-      package On_Queues is new
-        Ada.Containers.Unbounded_Synchronized_Queues (On_Queue_Inteface);
-      use On_Queues;
+      package Coordinate_Sets is new Ada.Containers.Ordered_Sets (Coordinates);
+      use Coordinate_Sets;
 
-      function Overlap (Left, Right : in Rectangles)
-                        return Boolean is
+      procedure Build_Z_Set (Boot_List : in Boot_Lists.Vector;
+                             Z_Set : out Coordinate_Sets.Set) is
 
-         -- Left has at least one vertex in Right
+         -- For any X,Y plane the cube count should be the the same as the
+         -- previous or next unless there is a new rectangular prism in play.
+         -- Thus a change in the cube count will only occur when the Z value
+         -- being evaluated is equal to the Z1 or Z2 value of some prism.
+         -- A check is provided by calculating for the Z value before the
+         -- change for the start of a prism and the Z value after the change for
+         -- the end of a prism. From examination of the input data this should
+         -- reduce the number of Z iterations from the order of 200,000 to
+         -- less than 2000, a factor of 100 increase in speed! Sets are used so
+         -- that if two or more boundaries coincide the calculations are not
+         -- repeated.
 
-      begin -- Overlap
-         return (((Right.X1 <= Left.X1 and Left.X1 <= Right.X2)
-                 or
-                   (Right.X1 <= Left.X2 and Left.X2 <= Right.X2))
-                 and
-                   ((Right.Y1 <= Left.Y1 and Left.Y1 <= Right.Y2)
-                    or
-                      (Right.Y1 <= Left.Y2 and Left.Y2 <= Right.Y2)));
-      end Overlap;
+      begin -- Build_Z_Set
+         Z_Set := Coordinate_Sets.Empty_Set;
+         for B in Iterate (Boot_List) loop
+            Include (Z_Set, Boot_List (B).Prism.Z1 - 1);
+            Include (Z_Set, Boot_List (B).Prism.Z1);
+            Include (Z_Set, Boot_List (B).Prism.Z2);
+            Include (Z_Set, Boot_List (B).Prism.Z2 + 1);
+         end loop; -- B in Iterate (Boot_List)
+      end Build_Z_Set;
 
-      function Contains (Left, Right : in Rectangles)
-                         return Boolean is
+      procedure Build_Y_Set (Rectangle_List : in Rectangle_Lists.Vector;
+                             Y_Set : out Coordinate_Sets.Set) is
 
-         -- Left fits entirely within Right
+         -- A similar argument can be applied to lines with varing Y. See
+         -- comments in procedure Build_Z_Set above.
 
-      begin -- Contains
-         return Right.X1 <= Left.X1 and Left.X2 <= Right.X2 and
-           Right.Y1 <= Left.Y1 and Left.Y2 <= Right.Y2;
-      end Contains;
+      begin -- Build_Y_Set
+         Y_Set := Coordinate_Sets.Empty_Set;
+         for R in Iterate (Rectangle_List) loop
+            Include (Y_Set, Rectangle_List (R).Y1 - 1);
+            Include (Y_Set, Rectangle_List (R).Y1);
+            Include (Y_Set, Rectangle_List (R).Y2);
+            Include (Y_Set, Rectangle_List (R).Y2 + 1);
+         end loop; -- B in Iterate (Rectangle_List)
+      end Build_Y_Set;
 
-      function Vertex_Q1 (Left, Right : in Rectangles)
-                             return Boolean is
-
-      begin -- Vertex_Q1
-         return Right.X1 <= Left.X2 and Left.X2 <= Right.X2 and
-           Right.Y1 <= Left.Y2 and Left.Y2 <= Right.Y2;
-      end Vertex_Q1;
-
-      function Vertex_Q2 (Left, Right : in Rectangles)
-                             return Boolean is
-
-      begin -- Vertex_Q2
-         return Right.X1 <= Left.X2 and Left.X2 <= Right.X2 and
-           Right.Y1 <= Left.Y1 and Left.Y1 <= Right.Y2;
-      end Vertex_Q2;
-
-      function Vertex_Q3 (Left, Right : in Rectangles)
-                             return Boolean is
-
-      begin -- Vertex_Q3
-         return Right.X1 <= Left.X1 and Left.X1 <= Right.X2 and
-           Right.Y1 <= Left.Y1 and Left.Y1 <= Right.Y2;
-      end Vertex_Q3;
-
-      function Vertex_Q4 (Left, Right : in Rectangles)
-                             return Boolean is
-
-      begin -- Vertex_Q4
-         return Right.X1 <= Left.X1 and Left.X1 <= Right.X2 and
-           Right.Y1 <= Left.Y2 and Left.Y2 <= Right.Y2;
-      end Vertex_Q4;
-
-      function Count_Vetices (Left, Right : in Rectangles)
-                                 return Vertex_Counts is
-
-         -- Returns the count of Left vertices within Right
-
-         Result : Natural := 0;
-
-      begin -- Count_Vetices
-         if Vertex_Q1 (Left, Right) then
-            Result := Result + 1;
-         end if; -- Vertex_Q1 (Left, Right)
-         if Vertex_Q2 (Left, Right) then
-            Result := Result + 1;
-         end if; -- Vertex_Q2 (Left, Right)
-         if Vertex_Q3 (Left, Right) then
-            Result := Result + 1;
-         end if; -- Vertex_Q3 (Left, Right)
-         if Vertex_Q4 (Left, Right) then
-            Result := Result + 1;
-         end if; -- Vertex_Q4 (Left, Right)
-         return Result;
-      end Count_Vetices;
-
-      procedure Split (Unchanged, To_Split : in Rectangles;
-                       On_Queue : in out On_Queues.Queue;
-                      Normal_Cut : Boolean := True) is
-
-         function Valid (Rectangle : in Rectangles) return Boolean is
-
-         begin -- Valid
-            return Rectangle.X1 <= Rectangle.X2 and
-              Rectangle.Y1 <= Rectangle.Y2;
-         end Valid;
-
-         type Rectangle_Indices is (C, D, E, F);
-         Rectangle_Array : array (Rectangle_Indices) of Rectangles;
-
-         Limit : Rectangle_Indices;
-
-      begin -- Split
-         --  Put_Line ("Vc" & Count_Vetices (Unchanged, To_Split)'Img);
-         case Count_Vetices (Unchanged, To_Split) is
-            when 4 =>
-               Limit := F;
-               Rectangle_Array (C) :=  (To_Split.X1, Unchanged.Y2 + 1,
-                                        Unchanged.X2, To_Split.Y2);
-               Rectangle_Array (D) := (Unchanged.X2 + 1, Unchanged.Y1,
-                                       To_Split.X2, To_Split.Y2);
-               Rectangle_Array (E) := (Unchanged.X1, To_Split.Y1,
-                                       To_Split.X2, Unchanged.Y1 - 1);
-               Rectangle_Array (F) := (To_Split.X1, To_Split.Y1,
-                                       Unchanged.X1 - 1, Unchanged.Y2);
-            when 2 =>
-               if Normal_Cut then
-                  Limit := E;
-                  if Vertex_Q2 (Unchanged, To_Split) and
-                    Vertex_Q3 (Unchanged, To_Split) then
-                     Rectangle_Array (C) := (To_Split.X1, To_Split.Y1,
-                                             To_Split.X2, Unchanged.Y1 - 1);
-                     Rectangle_Array (D) := (Unchanged.X2 + 1, Unchanged.Y1,
-                                             To_Split.X2, To_Split.Y2);
-                     Rectangle_Array (E) := (To_Split.X1, Unchanged.Y1,
-                                             Unchanged.X1 - 1, To_Split.Y2);
-                  elsif Vertex_Q3 (Unchanged, To_Split) and
-                    Vertex_Q4 (Unchanged, To_Split) then
-                     Rectangle_Array (C) := (To_Split.X1, To_Split.Y1,
-                                             Unchanged.X1 - 1, To_Split.Y2);
-                     Rectangle_Array (D) := (Unchanged.X1, To_Split.Y1,
-                                             To_Split.X2, Unchanged.Y1 - 1);
-                     Rectangle_Array (E) := (Unchanged.X1, Unchanged.Y2 + 1,
-                                             To_Split.X2, To_Split.Y2);
-                  elsif Vertex_Q1 (Unchanged, To_Split) and
-                    Vertex_Q4 (Unchanged, To_Split) then
-                     Rectangle_Array (C) := (To_Split.X1, Unchanged.Y2 + 1,
-                                             To_Split.X2, To_Split.Y2);
-                     Rectangle_Array (D) := (To_Split.X1, To_Split.Y1,
-                                             Unchanged.X1 - 1, Unchanged.Y2);
-                     Rectangle_Array (E) := (Unchanged.X2 + 1, To_Split.Y1,
-                                             To_Split.X2, Unchanged.Y2);
-                  elsif Vertex_Q1 (Unchanged, To_Split) and
-                    Vertex_Q2 (Unchanged, To_Split) then
-                     Rectangle_Array (C) := (Unchanged.X2 + 1, To_Split.Y1,
-                                             To_Split.X2, To_Split.Y2);
-                     Rectangle_Array (D) := (To_Split.X1, Unchanged.Y2 + 1,
-                                             Unchanged.X2, To_Split.Y2);
-                     Rectangle_Array (E) := (To_Split.X1, To_Split.Y1,
-                                             Unchanged.X2, Unchanged.Y1 - 1);
-                  end if; -- Vertex_Q2 (Unchanged, To_Split)
-               else
-                  Limit := C;
-                  if Vertex_Q2 (Unchanged, To_Split) and
-                    Vertex_Q3 (Unchanged, To_Split) then
-                     Rectangle_Array (C) := (Unchanged.X1, To_Split.Y2 + 1,
-                                             Unchanged.X2, Unchanged.Y2);
-                  elsif Vertex_Q3 (Unchanged, To_Split) and
-                    Vertex_Q4 (Unchanged, To_Split) then
-                     Rectangle_Array (C) := (To_Split.X2 + 1, Unchanged.Y1,
-                                             Unchanged.X2, Unchanged.y2);
-                  elsif Vertex_Q1 (Unchanged, To_Split) and
-                    Vertex_Q4 (Unchanged, To_Split) then
-                     Rectangle_Array (C) := (Unchanged.X1, Unchanged.Y1,
-                                             Unchanged.X2, To_Split.Y1 - 1);
-                  elsif Vertex_Q1 (Unchanged, To_Split) and
-                    Vertex_Q2 (Unchanged, To_Split) then
-                     Rectangle_Array (C) := (Unchanged.X1, Unchanged.Y1,
-                                             To_Split.X1 - 1, Unchanged.Y2);
-                  end if; -- Vertex_Q2 (Unchanged, To_Split)
-               end if; -- Normal_Cut
-            when 1 =>
-               Limit := D;
-               if Vertex_Q1 (Unchanged, To_Split) then
-                  Rectangle_Array (C) := (Unchanged.X2 + 1, To_Split.Y1,
-                                         To_Split.X2, To_Split.Y2);
-                  Rectangle_Array (D) := (To_Split.X1, Unchanged.Y2 + 1,
-                                         Unchanged.X2, To_Split.Y2);
-               elsif Vertex_Q2 (Unchanged, To_Split) then
-                  Rectangle_Array (C) := (Unchanged.X2 + 1, To_Split.Y1,
-                                         To_Split.X2, To_Split.Y2);
-                  Rectangle_Array (D) := (To_Split.X1, To_Split.Y1,
-                                         Unchanged.X2, Unchanged.Y1 - 1);
-               elsif Vertex_Q3 (Unchanged, To_Split) then
-                  Rectangle_Array (C) := (To_Split.X1, To_Split.Y1,
-                                         Unchanged.X1 - 1, To_Split.Y2);
-                  Rectangle_Array (D) := (Unchanged.X1, To_Split.Y1,
-                                         To_Split.X2, Unchanged.Y1 -1);
-               elsif Vertex_Q4 (Unchanged, To_Split) then
-                  Rectangle_Array (C) := (To_Split.X1, To_Split.Y1,
-                                          Unchanged.X1 - 1, To_Split.Y2);
-                  Rectangle_Array (D) := (Unchanged.X1, Unchanged.Y2 + 1,
-                                          To_Split.X2, To_Split.Y2);
-               end if; -- Vertex_Q1 (Unchanged, To_Split)
-            when 0 =>
-               null; -- nothing to do
-               Rectangle_Array (C) := (0, 0, -1, -1); -- Invalid rectangle
-               Limit := C;
-         end case; -- Count_Vetices (Unchanged, To_Split)
-         for R in Rectangle_Indices range C .. Limit loop
-            --  Put_Line (R'Img & Rectangle_Array (R).X1'Img & Rectangle_Array (R).Y1'Img & Rectangle_Array (R).X2'Img & Rectangle_Array (R).Y2'Img);
-            if Valid (Rectangle_Array (R)) then
-               On_Queue.Enqueue (Rectangle_Array (R));
-            end if; -- Valid (Rectangle_Array (R))
-         end loop; -- R in Rectangle_Indices range C .. Limit
-      end Split;
-
-      function Valid_On_List (Rectangle : in Rectangles;
-                              On_List : in On_Lists.List) return Boolean is
-
-         Result : Boolean := False;
-
-      begin -- Valid_On_List
-         for o in Iterate (On_List) loop
-            Result := Result or Overlap (Rectangle, On_List (O)) or
-              Overlap (On_List (O), Rectangle);
-         end loop;
-         return not Result;
-      end Valid_On_List;
-
-      Count, Count_Z : Unsigned_64 := 0;
-      Oc, To_Delete : On_Lists.Cursor;
-
+      Count :  Unsigned_64 := 0; -- Total for whole space
+      Count_Y, Previous_Count_Y : Unsigned_64 := 0; -- Total for one line
+      Count_Z, Previous_Count_Z : Unsigned_64 := 0; -- Total for one X,Y plane
       Rectangle : Rectangles;
-      On_List : On_Lists.List;
-      On_Queue : On_Queues.Queue;
-      Processed : Boolean;
+      Rectangle_List : Rectangle_Lists.Vector := Rectangle_Lists.Empty_Vector;
+      On_list : Coordinate_Lists.Map := Coordinate_Lists.Empty_Map;
+      Y_Set, Z_Set : Coordinate_Sets.Set;
+      Xc : Coordinate_Lists.Cursor;
+      X, X_Delete, Y, Previous_Y, Z, Previous_Z : Coordinates;
+      To_Add : Boolean;
 
    begin -- Part_Two_Count
-      for Z in Z_Coordinates loop
-         Clear (On_List);
+      Build_Z_Set (Boot_List, Z_Set);
+      Previous_Z := First_Element (Z_Set);
+      Previous_Count_Z := 0;
+      for Zc in Iterate (Z_Set) loop
+         Z := Z_Set (Zc);
+         Clear (Rectangle_List);
          Count_Z := 0;
          for B in Iterate (Boot_List) loop
-            if Boot_List (B).Prism.Z1 <= Z and
-              Z <= Boot_List (B).Prism.Z2 then
-               Rectangle := (X1 => Boot_List (B).Prism.X1,
-                             Y1 => Boot_List (B).Prism.Y1,
+            if Boot_List (B).Prism.Z1 <= Z and Z <= Boot_List (B).Prism.Z2 then
+               Rectangle := (Command => Boot_List (B).Command,
+                             X1 => Boot_List (B).Prism.X1,
                              X2 => Boot_List (B).Prism.X2,
+                             Y1 => Boot_List (B).Prism.Y1,
                              Y2 => Boot_List (B).Prism.Y2);
-               if Boot_List (B).Command then
-                  -- Turn on Rectangle
-                  --  Put_Line ("On " & Rectangle.X1'Img & Rectangle.Y1'Img & Rectangle.X2'Img & Rectangle.Y2'Img);
-                  On_Queue.Enqueue (Rectangle);
-                  while On_Queue.Current_Use > 0 loop
-                     On_Queue.Dequeue (Rectangle);
-                     Processed := False;
-                     Oc := First (On_List);
-                     while Oc /= On_Lists.No_Element and not Processed loop
-                        if Contains (On_List (Oc), Rectangle) then
-                           Assert (Count_Vetices (On_List (Oc), Rectangle) = 4,
-                                   "On contains /= 4");
-                           --  Put_Line ("On contains");
-                           To_Delete := Oc;
-                           Next (Oc);
-                           Delete (On_List, To_Delete);
-                           -- remove from list because it is totally contained
-                           -- in the rectangle to be added.
-                        elsif Contains (Rectangle, On_List (Oc)) then
-                           --  Put_Line ("On already on");
-                           Assert (Count_Vetices (Rectangle, On_List (Oc)) = 4,
-                                  "On already on /= 4");
-                           -- Already on so do nothng
-                           Processed := True;
-                        elsif Overlap (On_List (Oc), Rectangle) then
-                           --  Put ("On overlap L R");
-                           if Count_Vetices (On_List (Oc), Rectangle) = 2 then
-                              --  Put_Line (" 2");
-                              Split (On_List (Oc), Rectangle, On_Queue, False);
-                              To_Delete := Oc;
-                              Next (Oc);
-                              Delete (On_List, To_Delete);
-                           else
-                              Assert (Count_Vetices (On_List (Oc), Rectangle)
-                                      = 1, "On overlap L R /= 1");
-                              --  Put_Line (" 1");
-                              Split (On_List (Oc), Rectangle, On_Queue);
-                              Processed := True;
-                           end if; -- Count_Vetices (On_List (Oc), ...
-                        elsif Overlap (Rectangle, On_List (Oc)) then
-                           Assert (Count_Vetices (Rectangle, On_List (Oc)) = 2,
-                                   "On overlap R L /= 2");
-                           --  Put_Line ("On overlap R L");
-                           Split (Rectangle, On_List (Oc), On_Queue, False);
-                           Processed := True;
-                        else
-                           --  Put_Line ("On no overlap");
-                           Next (Oc);
-                        end if; -- Contains (On_List (Oc), Rectangle)
-                     end loop; -- Oc /= On_Lists.No_Element and not Processed
-                     if not Processed then
-                        -- did not overlap anything now in list
-                        Append (On_List, Rectangle);
-                     end if; -- not Processed
-                  end loop; -- On_Queue.Current_Use > 0
-               else
-                  -- Turn off Rectangle
-                  --  Put_Line ("Off " & Rectangle.X1'Img & Rectangle.Y1'Img & Rectangle.X2'Img & Rectangle.Y2'Img);
-                  Assert (On_Queue.Current_Use = 0, "Non empty queue");
-                  Oc := First (On_List);
-                  while Oc /= On_Lists.No_Element loop
-                     if Contains (On_List (Oc), Rectangle) then
-                        Assert (Count_Vetices (On_List (Oc), Rectangle)
-                                = 4, "Off contains /= 4");
-                        --  Put_Line ("Off contains");
-                        To_Delete := Oc;
-                        Next (Oc);
-                        Delete (On_List, To_Delete);
-                     elsif  Overlap (Rectangle, On_List (Oc)) then
-                        --  Put_Line ("Off overlap R L");
-                        Split (Rectangle, On_List (Oc), On_Queue);
-                        To_Delete := Oc;
-                        Next (Oc);
-                        Delete (On_List, To_Delete);
-                     elsif  Overlap (On_List (Oc), Rectangle) then
-                        Assert (Count_Vetices (On_List (Oc), Rectangle)
-                                = 2, "Off overlap L R /= 2");
-                        --  Put_Line ("Off overlap L R");
-                        Split (On_List (Oc), Rectangle, On_Queue, False);
-                        To_Delete := Oc;
-                        Next (Oc);
-                        Delete (On_List, To_Delete);
+               Append (Rectangle_List, Rectangle);
+            end if; -- Boot_List (B).Prism.Z1 <= Z and ...
+         end loop;
+         Build_Y_Set (Rectangle_List, Y_Set);
+         if not is_Empty (Y_Set) then
+            -- this test is necessary to avoid a runtime error if Y_Set is empty
+            Previous_Y := First_Element (Y_Set);
+         end if; -- not Empty_Set (Y_Set)
+         Previous_Count_Y := 0;
+         for Yc in Iterate (Y_Set) loop
+            Y := Y_Set (Yc);
+            Count_Y := 0;
+            Clear (On_list);
+            for R in Iterate (Rectangle_List) loop
+               if Rectangle_List (R).Y1 <= Y and Y <= Rectangle_List (R).Y2 then
+                  Rectangle := Rectangle_List (R);
+                  if Rectangle.Command then
+                     -- Turn on
+                     To_Add := True;
+                     if Is_Empty (On_list) then
+                        Insert (On_list, Rectangle.X1, Rectangle.X2);
                      else
-                        --  Put_Line ("Off no overlap");
-                        Next (Oc);
-                     end if; -- Contains (On_List (Oc), Rectangle)
-                  end loop; -- Oc /= On_Lists.No_Element
-                  while On_Queue.Current_Use > 0 loop
-                     On_Queue.Dequeue (Rectangle);
-                     Append (On_List, Rectangle);
-                  end loop; -- On_Queue.Current_Use > 0
-               end if; -- Boot_List (B).Command
-            end if; -- Boot_List (B).Prism.Z1 <= Z
-         end loop; -- B in Iterate (Boot_List)
-         for O in Iterate (On_List) loop
-            --  Put_Line (On_List (O).X1'Img & On_List (O).Y1'Img & On_List (O).X2'Img & On_List (O).Y2'Img & Unsigned_64'Image (Unsigned_64 (On_List (O).X2 - On_List (O).X1 + 1) * Unsigned_64(On_List (O).Y2 - On_List (O).Y1 + 1)));
-            Count_Z := Count_Z + Unsigned_64 (On_List (O).X2 - On_List (O).X1 + 1) *
-              Unsigned_64 (On_List (O).Y2 - On_List (O).Y1 + 1);
-         end loop; -- O in Iterate (On_List)
-         Count := Count + Count_Z;
-         --  Put_Line ("Z:" & Z'Img & Count_Z'Img & Count'Img);
-      end loop; -- Z in Z_Coordinates
+                        Xc := First (On_List);
+                        while Xc /= Coordinate_Lists.No_Element and
+                          To_Add loop
+                           if Rectangle.X1 <= Key (Xc) and
+                             On_list (Xc) <= Rectangle.X2 then
+                              -- An existing line of turned on cubes is totally
+                              -- contained within the line to be turned on.
+                              X_Delete := Key (Xc);
+                              Delete (On_list, X_Delete);
+                              Xc := Ceiling (On_list, X_Delete);
+                           elsif Key (Xc) <= Rectangle.X1 and
+                             Rectangle.X2 <= On_list (Xc) then
+                              -- Rectangle is totally contained in existing
+                              -- On_List element and thus can be discarded.
+                              To_Add := False;
+                           elsif Key (Xc) <= Rectangle.X2 and
+                             Rectangle.X2 <= On_list (Xc) then
+                              -- Extend Rectangle at X2 end
+                              Rectangle.X2 := On_list (Xc);
+                              X_Delete := Key (Xc);
+                              Delete (On_list, X_Delete);
+                              Xc := Ceiling (On_list, X_Delete);
+                           elsif Key (Xc) <= Rectangle.X1 and
+                             Rectangle.X1 <= On_list (Xc) then
+                              -- Extend Rectangle at X1 end
+                              Rectangle.X1 := Key (Xc);
+                              X_Delete := Key (Xc);
+                              Delete (On_list, X_Delete);
+                              Xc := Ceiling (On_list, X_Delete);
+                           else
+                              -- No Overlap
+                              Next (Xc);
+                           end if; -- Rectangle.X1 <= Key (Xc) and ...
+                        end loop; -- Xc /= Coordinate_Lists.No_Element
+                        if To_Add then
+                           -- After the above tests the line being added should
+                           -- be non overlaping with any line in On_List.
+                           Insert (On_list, Rectangle.X1, Rectangle.X2);
+                        end if; -- To_Add
+                     end if; -- Is_Empty (On_list)
+                  else
+                     -- Turn off
+                     Xc := First (On_List);
+                     while Xc /= Coordinate_Lists.No_Element loop
+                        if Rectangle.X1 <= Key (Xc) and
+                          On_list (Xc) <= Rectangle.X2 then
+                           -- On_List element totally included in deletion,
+                           --remove from On_list
+                           X_Delete := Key (Xc);
+                           X := On_list (Xc);
+                           Delete (On_list, X_Delete);
+                           Xc := Ceiling (On_list, X);
+                        elsif Key (Xc) < Rectangle.X1 and
+                          Rectangle.X2 < On_list (Xc) then
+                           -- Deletion range lies completely within On_List
+                           -- element, split in two. Note < and > operators
+                           -- at least one cube must remain for a valid
+                           -- On_List element!
+                           X := On_list (Xc);
+                           X_Delete := Key (Xc);
+                           Delete (On_List, Xc);
+                           -- Required to prevent run time error tampering
+                           -- with cursor  Xc
+                           Insert (On_list, X_Delete, Rectangle.X1 - 1);
+                           Insert (On_list, Rectangle.X2 + 1, X);
+                           Xc := Ceiling (On_List, Rectangle.X2);
+                        elsif Key (Xc) <= Rectangle.X2 and
+                          Rectangle.X2 < On_list (Xc) then
+                           -- Deletion at X1, since this is the key a new
+                           -- element must be included and the old one
+                           -- deleted
+                           X_Delete := Key (Xc);
+                           X := On_list (Xc);
+                           Delete (On_list, Xc);
+                           insert (On_list, Rectangle.X2 + 1, X);
+                           Xc := Ceiling (On_list, X);
+                        elsif Key (Xc) < Rectangle.X1 and
+                          Rectangle.X1 <= On_list (Xc) then
+                           -- Deletion at X2 end, set X2 only.
+                           On_List (Xc) := Rectangle.X1 - 1;
+                           Next (Xc);
+                        else
+                           -- no overlap
+                           Next (Xc);
+                        end if; -- Rectangle.X1 <= Key (Xc) and
+                     end loop; -- Xc /= Coordinate_Lists.No_Element
+                  end if; -- Rectangle.Command
+               end if; -- Rectangle_List (R).Y1 <= Y and ...
+            end loop; -- R in Iterate (Rectangle_List)
+            for O in Iterate (On_list) loop
+               Assert (Key (O) <= On_list (O), "Invalid line");
+               Count_Y := Count_Y + Unsigned_64 (On_List (O) - Key (O) + 1);
+            end loop; -- O in Iterate (On_list)
+            if Y - Previous_Y > 1 then
+               Assert (Count_Y = Previous_Count_Y,
+                       "Unexpected change in Count_Y");
+               Count_Z := Count_Z + Count_Y * Unsigned_64 (Y - Previous_Y);
+            else
+               Count_Z := Count_Z + Count_Y;
+            end if; -- Y - Previous_Y > 1
+            Previous_Y := Y;
+            Previous_Count_Y := Count_Y;
+         end loop; -- Yc in Iterate (Y_Set)
+         if Z - Previous_Z > 1 then
+            Assert (Count_Z = Previous_Count_Z, "Unexpected change in Count_Z");
+            Count := Count + Count_Z * Unsigned_64 (Z - Previous_Z);
+         else
+            Count := Count + Count_Z;
+         end if; -- Z - Previous_Z > 1
+         Previous_Z := Z;
+         Previous_Count_Z := Count_Z;
+      end loop; -- Zc in Iterate (Z_Sets)
       return Count;
    end Part_Two_Count;
 
    Boot_List : Boot_Lists.Vector;
-      Cube_Array : Cube_Arrays := (others => (others => (others => False)));
-      Z_Min, Z_Max : Coordinates;
+   Cube_Array : Cube_Arrays := (others => (others => (others => False)));
 
 begin -- December_22
    Get_Input (Boot_List);
-   for I in Iterate (Boot_List) loop
-      Update (Cube_Array, Boot_List (I));
-   end loop; -- I in Iterate Boot_List)
+   for B in Iterate (Boot_List) loop
+      Update (Cube_Array, Boot_List (B));
+   end loop; -- B in Iterate Boot_List)
    Put_Line ("Part One Answer:" & Cube_Count (Cube_Array)'Img);
    DJH.Execution_Time.Put_CPU_Time;
-   Find_Z_Limits (Boot_List, Z_Min, Z_Max);
-   Put_Line ("Part Two Answer:" & Part_Two_Count (Boot_List, Z_Min, Z_Max)'Img);
+   Put_Line ("Part Two Answer:" & Part_Two_Count (Boot_List)'Img);
    DJH.Execution_Time.Put_CPU_Time;
-   Put_Line (Unsigned_64'Image (Unsigned_64'Last));
 end December_22;
